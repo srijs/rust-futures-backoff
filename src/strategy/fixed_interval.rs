@@ -1,38 +1,18 @@
-use std::time::Duration;
 use std::iter::Iterator;
 
-/// A retry strategy driven by a fixed interval.
 #[derive(Debug, Clone)]
-pub struct FixedInterval {
-    duration: Duration
-}
+pub struct FixedInterval {}
 
 impl FixedInterval {
-    /// Constructs a new fixed interval strategy.
-    pub fn new(duration: Duration) -> FixedInterval {
-        FixedInterval{duration: duration}
-    }
-
-    /// Constructs a new fixed interval strategy,
-    /// given a duration in milliseconds.
-    pub fn from_millis(millis: u64) -> FixedInterval {
-        FixedInterval{duration: Duration::from_millis(millis)}
+    pub fn new() -> FixedInterval {
+        FixedInterval {}
     }
 }
 
 impl Iterator for FixedInterval {
-    type Item = Duration;
+    type Item = u32;
 
-    fn next(&mut self) -> Option<Duration> {
-        Some(self.duration)
+    fn next(&mut self) -> Option<u32> {
+        Some(1)
     }
-}
-
-#[test]
-fn returns_some_fixed() {
-    let mut s = FixedInterval::new(Duration::from_millis(123));
-
-    assert_eq!(s.next(), Some(Duration::from_millis(123)));
-    assert_eq!(s.next(), Some(Duration::from_millis(123)));
-    assert_eq!(s.next(), Some(Duration::from_millis(123)));
 }

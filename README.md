@@ -1,6 +1,6 @@
 # futures-retry
 
-Extensible, asynchronous retry behaviours based on [futures](https://crates.io/crates/futures).
+Asynchronous retry strategies based on [futures](https://crates.io/crates/futures).
 
 [![Build Status](https://travis-ci.org/srijs/rust-futures-retry.svg?branch=master)](https://travis-ci.org/srijs/rust-futures-retry)
 [![crates](http://meritbadge.herokuapp.com/futures-retry)](https://crates.io/crates/futures-retry)
@@ -23,23 +23,17 @@ futures-retry = "0.1"
 extern crate futures;
 extern crate futures_retry;
 
-use futures::Future;
-use futures_retry::Retry;
-use futures_retry::strategy::{ExponentialBackoff, jitter};
-
-fn action() -> Result<u64, ()> {
-    // do some real-world stuff here...
-    Ok(42)
-}
+use futures::{Future, future};
+use futures_retry::retry;
 
 fn main() {
-    let retry_strategy = ExponentialBackoff::from_millis(10)
-        .map(jitter)
-        .take(3);
+    let future = retry(|| {
+        // do some real-world stuff here...
+        future::ok::<u32, ::std::io::Error>(42)
+    });
 
-    let retry_future = Retry::spawn(retry_strategy, action);
-    let retry_result = retry_future.wait();
+    let result = future.wait();
 
-    assert_eq!(retry_result, Ok(42));
+    assert_eq!(result, Ok(42));
 }
 ```

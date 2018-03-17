@@ -1,58 +1,12 @@
-use std::iter::{Iterator, IntoIterator};
-use std::error;
-use std::io;
-use std::cmp;
-use std::fmt;
-use std::time::{Duration, Instant};
+use std::io::Error;
+use std::time::Instant;
 
 use futures::{Async, Future, Poll};
 use futures_timer::{Delay, TimerHandle};
 
+use super::strategy::{Strategy, StrategyIter};
 use super::action::Action;
 use super::condition::Condition;
-
-/// Represents the errors possible during the execution of the `RetryFuture`.
-#[derive(Debug)]
-pub enum Error<E> {
-    OperationError(E),
-    TimerError(io::Error)
-}
-
-impl<E: cmp::PartialEq> cmp::PartialEq for Error<E> {
-    fn eq(&self, other: &Error<E>) -> bool  {
-        match (self, other) {
-            (&Error::TimerError(_), _) => false,
-            (_, &Error::TimerError(_)) => false,
-            (&Error::OperationError(ref left_err), &Error::OperationError(ref right_err)) =>
-                left_err.eq(right_err)
-        }
-    }
-}
-
-impl<E: fmt::Display> fmt::Display for Error<E> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            Error::OperationError(ref err) => err.fmt(formatter),
-            Error::TimerError(ref err) => err.fmt(formatter)
-        }
-    }
-}
-
-impl<E: error::Error> error::Error for Error<E> {
-    fn description(&self) -> &str {
-        match *self {
-            Error::OperationError(ref err) => err.description(),
-            Error::TimerError(ref err) => err.description()
-        }
-    }
-
-    fn cause(&self) -> Option<&error::Error> {
-        match *self {
-            Error::OperationError(ref err) => Some(err),
-            Error::TimerError(ref err) => Some(err)
-        }
-    }
-}
 
 enum RetryState<A> where A: Action {
     Running(A::Future),
@@ -72,32 +26,29 @@ impl<A: Action> RetryState<A> {
 
 enum RetryFuturePoll<A> where A: Action {
     Running(Poll<A::Item, A::Error>),
-    Sleeping(Poll<(), io::Error>)
+    Sleeping(Poll<(), Error>)
 }
 
 /// Future that drives multiple attempts at an action via a retry strategy.
-pub struct Retry<I, A> where I: Iterator<Item=Duration>, A: Action {
-    retry_if: RetryIf<I, A, fn(&A::Error) -> bool>
+pub struct Retry<A> where A: Action {
+    retry_if: RetryIf<A, fn(&A::Error) -> bool>
 }
 
-impl<I, A> Retry<I, A>
-    where I: Iterator<Item=Duration>,
-          A: Action
-{
-    pub fn spawn<T: IntoIterator<IntoIter=I, Item=Duration>>(strategy: T, action: A) -> Retry<I, A> {
-        Retry::spawn_with_handle(TimerHandle::default(), strategy, action)
+impl<A: Action> Retry<A> {
+    pub fn new(strategy: &Strategy, action: A) -> Retry<A> {
+        Retry::new_with_handle(TimerHandle::default(), strategy, action)
     }
 
-    pub fn spawn_with_handle<T: IntoIterator<IntoIter=I, Item=Duration>>(handle: TimerHandle, strategy: T, action: A) -> Retry<I, A> {
+    pub fn new_with_handle(handle: TimerHandle, strategy: &Strategy, action: A) -> Retry<A> {
         Retry {
-            retry_if: RetryIf::spawn_with_handle(handle, strategy, action, (|_| true) as fn(&A::Error) -> bool)
+            retry_if: RetryIf::new_with_handle(handle, strategy, action, (|_| true) as fn(&A::Error) -> bool)
         }
     }
 }
 
-impl<I, A> Future for Retry<I, A> where I: Iterator<Item=Duration>, A: Action {
+impl<A: Action> Future for Retry<A> {
     type Item = A::Item;
-    type Error = Error<A::Error>;
+    type Error = A::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         self.retry_if.poll()
@@ -106,39 +57,37 @@ impl<I, A> Future for Retry<I, A> where I: Iterator<Item=Duration>, A: Action {
 
 /// Future that drives multiple attempts at an action via a retry strategy. Retries are only attempted if
 /// the `Error` returned by the future satisfies a given condition.
-pub struct RetryIf<I, A, C>
-    where I: Iterator<Item=Duration>,
-          A: Action,
+pub struct RetryIf<A, C>
+    where A: Action,
           C: Condition<A::Error>
 {
-    strategy: I,
+    strategy_iter: StrategyIter,
     state: RetryState<A>,
     action: A,
     handle: TimerHandle,
     condition: C
 }
 
-impl<I, A, C> RetryIf<I, A, C>
-    where I: Iterator<Item=Duration>,
-          A: Action,
+impl<A, C> RetryIf<A, C>
+    where A: Action,
           C: Condition<A::Error>
 {
-    pub fn spawn<T: IntoIterator<IntoIter=I, Item=Duration>>(
-        strategy: T,
+    pub fn new(
+        strategy: &Strategy,
         action: A,
         condition: C
-    ) -> RetryIf<I, A, C> {
-        RetryIf::spawn_with_handle(TimerHandle::default(), strategy, action, condition)
+    ) -> RetryIf<A, C> {
+        RetryIf::new_with_handle(TimerHandle::default(), strategy, action, condition)
     }
 
-    pub fn spawn_with_handle<T: IntoIterator<IntoIter=I, Item=Duration>>(
+    pub fn new_with_handle(
         handle: TimerHandle,
-        strategy: T,
+        strategy: &Strategy,
         mut action: A,
         condition: C
-    ) -> RetryIf<I, A, C> {
+    ) -> RetryIf<A, C> {
         RetryIf {
-            strategy: strategy.into_iter(),
+            strategy_iter: strategy.iter(),
             state: RetryState::Running(action.run()),
             action: action,
             handle: handle,
@@ -146,15 +95,15 @@ impl<I, A, C> RetryIf<I, A, C>
         }
     }
 
-    fn attempt(&mut self) -> Poll<A::Item, Error<A::Error>> {
+    fn attempt(&mut self) -> Poll<A::Item, A::Error> {
         let future = self.action.run();
         self.state = RetryState::Running(future);
         self.poll()
     }
 
-    fn retry(&mut self, err: A::Error) -> Poll<A::Item, Error<A::Error>> {
-        match self.strategy.next() {
-            None => Err(Error::OperationError(err)),
+    fn retry(&mut self, err: A::Error) -> Poll<A::Item, A::Error> {
+        match self.strategy_iter.next() {
+            None => Err(err),
             Some(duration) => {
                 let instant = Instant::now() + duration;
                 let future = Delay::new_handle(instant, self.handle.clone());
@@ -165,13 +114,12 @@ impl<I, A, C> RetryIf<I, A, C>
     }
 }
 
-impl<I, A, C> Future for RetryIf<I, A, C>
-    where I: Iterator<Item=Duration>,
-          A: Action,
+impl<A, C> Future for RetryIf<A, C>
+    where A: Action,
           C: Condition<A::Error>
 {
     type Item = A::Item;
-    type Error = Error<A::Error>;
+    type Error = A::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         match self.state.poll() {
@@ -181,87 +129,93 @@ impl<I, A, C> Future for RetryIf<I, A, C>
                     if self.condition.should_retry(&err) {
                         self.retry(err)
                     } else {
-                        Err(Error::OperationError(err))
+                        Err(err)
                     }
                 }
             },
-            RetryFuturePoll::Sleeping(poll_result) => match poll_result {
-                Ok(Async::NotReady) => Ok(Async::NotReady),
-                Ok(Async::Ready(_)) => self.attempt(),
-                Err(err) => Err(Error::TimerError(err))
+            RetryFuturePoll::Sleeping(poll_result) => match poll_result.unwrap() {
+                Async::NotReady => Ok(Async::NotReady),
+                Async::Ready(_) => self.attempt()
             }
         }
     }
 }
 
-#[test]
-fn attempts_just_once() {
-    use std::iter::empty;
-    let mut num_calls = 0;
-    let res = {
-        let fut = Retry::spawn(empty(), || {
-            num_calls += 1;
-            Err::<(), u64>(42)
-        });
-        fut.wait()
-    };
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+    use futures::Future;
+    use super::Strategy;
 
-    assert_eq!(res, Err(Error::OperationError(42)));
-    assert_eq!(num_calls, 1);
-}
-
-#[test]
-fn attempts_until_max_retries_exceeded() {
-    use super::strategy::FixedInterval;
-    let s = FixedInterval::from_millis(100).take(2);
-    let mut num_calls = 0;
-    let res = {
-        let fut = Retry::spawn(s, || {
-            num_calls += 1;
-            Err::<(), u64>(42)
-        });
-        fut.wait()
-    };
-
-    assert_eq!(res, Err(Error::OperationError(42)));
-    assert_eq!(num_calls, 3);
-}
-
-#[test]
-fn attempts_until_success() {
-    use super::strategy::FixedInterval;
-    let s = FixedInterval::from_millis(100);
-    let mut num_calls = 0;
-    let res = {
-        let fut = Retry::spawn(s, || {
-            num_calls += 1;
-            if num_calls < 4 {
+    #[test]
+    fn attempts_just_once() {
+        let s = Strategy::fixed(Duration::from_millis(100))
+            .with_max_retries(0);
+        let mut num_calls = 0;
+        let res = {
+            let fut = s.retry(|| {
+                num_calls += 1;
                 Err::<(), u64>(42)
-            } else {
-                Ok::<(), u64>(())
-            }
-        });
-        fut.wait()
-    };
-
-    assert_eq!(res, Ok(()));
-    assert_eq!(num_calls, 4);
-}
-
-#[test]
-fn attempts_retry_only_if_given_condition_is_true() {
-    use super::strategy::FixedInterval;
-    let s = FixedInterval::from_millis(100).take(5);
-    let mut num_calls = 0;
-    let res = {
-        let action = || {
-            num_calls += 1;
-            Err::<(), u64>(num_calls)
+            });
+            fut.wait()
         };
-        let fut = RetryIf::spawn(s, action, |e: &u64| *e < 3);
-        fut.wait()
-    };
 
-    assert_eq!(res, Err(Error::OperationError(3)));
-    assert_eq!(num_calls, 3);
+        assert_eq!(res, Err(42));
+        assert_eq!(num_calls, 1);
+    }
+
+    #[test]
+    fn attempts_until_max_retries_exceeded() {
+        let s = Strategy::fixed(Duration::from_millis(100))
+            .with_max_retries(2);
+        let mut num_calls = 0;
+        let res = {
+            let fut = s.retry(|| {
+                num_calls += 1;
+                Err::<(), u64>(42)
+            });
+            fut.wait()
+        };
+
+        assert_eq!(res, Err(42));
+        assert_eq!(num_calls, 3);
+    }
+
+    #[test]
+    fn attempts_until_success() {
+        let s = Strategy::fixed(Duration::from_millis(100));
+        let mut num_calls = 0;
+        let res = {
+            let fut = s.retry(|| {
+                num_calls += 1;
+                if num_calls < 4 {
+                    Err::<(), u64>(42)
+                } else {
+                    Ok::<(), u64>(())
+                }
+            });
+            fut.wait()
+        };
+
+        assert_eq!(res, Ok(()));
+        assert_eq!(num_calls, 4);
+    }
+
+    #[test]
+    fn attempts_retry_only_if_given_condition_is_true() {
+        let s = Strategy::fixed(Duration::from_millis(100))
+            .with_max_retries(5);
+        let mut num_calls = 0;
+        let res = {
+            let action = || {
+                num_calls += 1;
+                Err::<(), u64>(num_calls)
+            };
+            let fut = s.retry_if(action, |e: &u64| *e < 3);
+            fut.wait()
+        };
+
+        assert_eq!(res, Err(3));
+        assert_eq!(num_calls, 3);
+    }
 }

@@ -2,7 +2,7 @@
 name = "futures-retry"
 version = "0.1.0"
 authors = ["Sam Rijs <srijs@airpost.net>"]
-description = "Extensible, asynchronous retry behaviours for futures"
+description = "Asynchronous retry strategies for futures"
 license = "MIT"
 repository = "https://github.com/srijs/rust-futures-retry"
 documentation = "https://docs.rs/futures-retry"
