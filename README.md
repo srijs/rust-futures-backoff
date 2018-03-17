@@ -1,13 +1,12 @@
-# tokio-retry
+# futures-retry
 
-Extensible, asynchronous retry behaviours based on [futures](https://crates.io/crates/futures), for the ecosystem of [tokio](https://tokio.rs/) libraries.
+Extensible, asynchronous retry behaviours based on [futures](https://crates.io/crates/futures).
 
-[![Build Status](https://travis-ci.org/srijs/rust-tokio-retry.svg?branch=master)](https://travis-ci.org/srijs/rust-tokio-retry)
-[![crates](http://meritbadge.herokuapp.com/tokio-retry)](https://crates.io/crates/tokio-retry)
-[![dependency status](https://deps.rs/repo/github/srijs/rust-tokio-retry/status.svg)](https://deps.rs/repo/github/srijs/rust-tokio-retry)
+[![Build Status](https://travis-ci.org/srijs/rust-futures-retry.svg?branch=master)](https://travis-ci.org/srijs/rust-futures-retry)
+[![crates](http://meritbadge.herokuapp.com/futures-retry)](https://crates.io/crates/futures-retry)
+[![dependency status](https://deps.rs/repo/github/srijs/rust-futures-retry/status.svg)](https://deps.rs/repo/github/srijs/rust-futures-retry)
 
-
-[Documentation](https://docs.rs/tokio-retry)
+[Documentation](https://docs.rs/futures-retry)
 
 ## Installation
 
@@ -15,18 +14,18 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tokio-retry = "0.1"
+futures-retry = "0.1"
 ```
 
 ## Examples
 
 ```rust
-extern crate tokio_core;
-extern crate tokio_retry;
+extern crate futures;
+extern crate futures_retry;
 
-use tokio_core::reactor::Core;
-use tokio_retry::Retry;
-use tokio_retry::strategy::{ExponentialBackoff, jitter};
+use futures::Future;
+use futures_retry::Retry;
+use futures_retry::strategy::{ExponentialBackoff, jitter};
 
 fn action() -> Result<u64, ()> {
     // do some real-world stuff here...
@@ -34,14 +33,12 @@ fn action() -> Result<u64, ()> {
 }
 
 fn main() {
-    let mut core = Core::new().unwrap();
-
     let retry_strategy = ExponentialBackoff::from_millis(10)
         .map(jitter)
         .take(3);
-  
-    let retry_future = Retry::spawn(core.handle(), retry_strategy, action);
-    let retry_result = core.run(retry_future);
+
+    let retry_future = Retry::spawn(retry_strategy, action);
+    let retry_result = retry_future.wait();
 
     assert_eq!(retry_result, Ok(42));
 }

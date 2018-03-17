@@ -1,18 +1,17 @@
 [package]
-name = "tokio-retry"
-version = "0.1.1"
+name = "futures-retry"
+version = "0.1.0"
 authors = ["Sam Rijs <srijs@airpost.net>"]
-description = "Extensible, asynchronous retry behaviours for futures/tokio"
+description = "Extensible, asynchronous retry behaviours for futures"
 license = "MIT"
-repository = "https://github.com/srijs/rust-tokio-retry"
-documentation = "https://docs.rs/tokio-retry"
-keywords = ["futures", "tokio", "retry", "backoff", "middleware"]
+repository = "https://github.com/srijs/rust-futures-retry"
+documentation = "https://docs.rs/futures-retry"
+keywords = ["futures", "retry", "backoff"]
 
 [dependencies]
-futures = "0.1.11"
+futures = "0.1.15"
+futures-timer = "0.1.1"
 rand = "0.4.0"
-tokio-core = "0.1.6"
-tokio-service = "0.1.0"
 
 [dev-dependencies]
 quickcheck = "0.6.0"
