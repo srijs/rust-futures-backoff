@@ -11,17 +11,17 @@
 //!
 //! ```toml
 //! [dependencies]
-//! futures-retry = "0.1"
+//! futures-backoff = "0.1"
 //! ```
 //!
 //! # Examples
 //!
 //! ```rust
 //! extern crate futures;
-//! extern crate futures_retry;
+//! extern crate futures_backoff;
 //!
 //! use futures::{Future, future};
-//! use futures_retry::retry;
+//! use futures_backoff::retry;
 //!
 //! fn main() {
 //!     let future = retry(|| {
@@ -59,9 +59,9 @@ pub use future::{Retry, RetryIf};
 ///
 /// ```rust
 /// # extern crate futures;
-/// # extern crate futures_retry;
+/// # extern crate futures_backoff;
 /// # use futures::{Future, future};
-/// # use futures_retry::retry;
+/// # use futures_backoff::retry;
 /// #
 /// # fn main() {
 /// let future = retry(|| {
@@ -86,10 +86,10 @@ pub fn retry<A: Action>(action: A) -> Retry<A> {
 ///
 /// ```rust
 /// # extern crate futures;
-/// # extern crate futures_retry;
+/// # extern crate futures_backoff;
 /// # use std::io::{Error, ErrorKind};
 /// # use futures::{Future, future};
-/// # use futures_retry::retry_if;
+/// # use futures_backoff::retry_if;
 /// #
 /// # fn main() {
 /// let future = retry_if(|| {

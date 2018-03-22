@@ -1,12 +1,12 @@
-# futures-retry
+# futures-backoff
 
 Asynchronous retry strategies based on [futures](https://crates.io/crates/futures).
 
-[![Build Status](https://travis-ci.org/srijs/rust-futures-retry.svg?branch=master)](https://travis-ci.org/srijs/rust-futures-retry)
-[![crates](http://meritbadge.herokuapp.com/futures-retry)](https://crates.io/crates/futures-retry)
-[![dependency status](https://deps.rs/repo/github/srijs/rust-futures-retry/status.svg)](https://deps.rs/repo/github/srijs/rust-futures-retry)
+[![Build Status](https://travis-ci.org/srijs/rust-futures-backoff.svg?branch=master)](https://travis-ci.org/srijs/rust-futures-backoff)
+[![crates](http://meritbadge.herokuapp.com/futures-backoff)](https://crates.io/crates/futures-backoff)
+[![dependency status](https://deps.rs/repo/github/srijs/rust-futures-backoff/status.svg)](https://deps.rs/repo/github/srijs/rust-futures-backoff)
 
-[Documentation](https://docs.rs/futures-retry)
+[Documentation](https://docs.rs/futures-backoff)
 
 ## Installation
 
@@ -14,17 +14,17 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-futures-retry = "0.1"
+futures-backoff = "0.1"
 ```
 
 ## Examples
 
 ```rust
 extern crate futures;
-extern crate futures_retry;
+extern crate futures_backoff;
 
 use futures::{Future, future};
-use futures_retry::retry;
+use futures_backoff::retry;
 
 fn main() {
     let future = retry(|| {

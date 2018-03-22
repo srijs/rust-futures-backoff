@@ -28,9 +28,9 @@ enum FactorType {
 ///
 /// ```rust
 /// # extern crate futures;
-/// # extern crate futures_retry;
+/// # extern crate futures_backoff;
 /// # use futures::{Future, future};
-/// # use futures_retry::Strategy;
+/// # use futures_backoff::Strategy;
 /// #
 /// # fn main() {
 /// let strategy = Strategy::default()
