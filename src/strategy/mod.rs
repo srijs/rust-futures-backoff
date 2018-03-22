@@ -12,6 +12,7 @@ pub use self::exponential_backoff::ExponentialBackoff;
 pub use self::fibonacci_backoff::FibonacciBackoff;
 pub use self::jitter::jitter;
 
+#[derive(Debug)]
 enum FactorType {
     Exponential,
     Fibonacci,
@@ -19,6 +20,31 @@ enum FactorType {
 }
 
 /// Configurable retry strategy.
+///
+/// Implements `Default`, which returns an exponential backoff strategy
+/// with a delay of 1 second and a maximum of 5 retries.
+///
+/// # Example
+///
+/// ```rust
+/// # extern crate futures;
+/// # extern crate futures_retry;
+/// # use futures::{Future, future};
+/// # use futures_retry::Strategy;
+/// #
+/// # fn main() {
+/// let strategy = Strategy::default()
+///     .with_max_retries(3);
+///
+/// let future = strategy.retry(|| {
+///     // do some real-world stuff here...
+///     future::ok::<u32, ::std::io::Error>(42)
+/// });
+/// #
+/// # assert_eq!(future.wait().unwrap(), 42);
+/// # }
+/// ```
+#[derive(Debug)]
 pub struct Strategy {
     factor: FactorType,
     delay: Duration,
@@ -40,16 +66,18 @@ impl Default for Strategy {
 }
 
 impl Strategy {
-    /// A retry strategy driven by exponential back-off.
+    /// Creates a retry strategy driven by exponential back-off.
     ///
-    /// The power corresponds to the number of past attempts.
+    /// The specified duration will be multiplied by `2^n`, where `n` is
+    /// the number of failed attempts.
     pub fn exponential(delay: Duration) -> Strategy {
         Strategy::new(FactorType::Exponential, delay)
     }
 
-    /// A retry strategy driven by the fibonacci series.
+    /// Creates a retry strategy driven by a fibonacci back-off.
     ///
-    /// Each retry uses a delay which is the sum of the two previous delays.
+    /// The specified duration will be multiplied by `fib(n)`, where `n` is
+    /// the number of failed attempts.
     ///
     /// Depending on the problem at hand, a fibonacci retry strategy might
     /// perform better and lead to better throughput than the `ExponentialBackoff`
@@ -61,7 +89,7 @@ impl Strategy {
         Strategy::new(FactorType::Fibonacci, delay)
     }
 
-    /// A retry strategy driven by a fixed interval.
+    /// Creates a retry strategy driven by a fixed delay.
     pub fn fixed(delay: Duration) -> Strategy {
         Strategy::new(FactorType::Fixed, delay)
     }
@@ -76,16 +104,26 @@ impl Strategy {
         }
     }
 
+    /// Sets the maximum delay between two attempts.
+    ///
+    /// By default there is no maximum.
     pub fn with_max_delay(mut self, duration: Duration) -> Self {
         self.max_delay = Some(duration);
         self
     }
 
+    /// Sets the maximum number of retry attempts.
+    ///
+    /// By default a retry will be attempted 5 times before giving up.
     pub fn with_max_retries(mut self, retries: usize) -> Self {
         self.max_retries = retries;
         self
     }
 
+    /// Enables or disables jitter on the delay.
+    ///
+    /// Jitter will introduce a random variance to the retry strategy,
+    /// which can be helpful to mitigate the "Thundering Herd" problem.
     pub fn with_jitter(mut self, jitter: bool) -> Self {
         self.jitter = jitter;
         self
@@ -109,12 +147,12 @@ impl Strategy {
         }
     }
 
-    /// Run the given action, and retry on failure.
+    /// Run the given action, and use this strategy to retry on failure.
     pub fn retry<A: Action>(&self, action: A) -> Retry<A> {
         Retry::new(self, action)
     }
 
-    /// Run the given action, and retry on failure if the error satisfies a given condition.
+    /// Run the given action, and use this strategy to retry on failure if the error satisfies a given condition.
     pub fn retry_if<A: Action, C>(&self, action: A, condition: C) -> RetryIf<A, C>
         where C: Condition<A::Error>
     {

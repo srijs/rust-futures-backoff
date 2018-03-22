@@ -1,4 +1,5 @@
 use std::io::Error;
+use std::fmt;
 use std::time::Instant;
 
 use futures::{Async, Future, Poll};
@@ -35,14 +36,22 @@ pub struct Retry<A> where A: Action {
 }
 
 impl<A: Action> Retry<A> {
+    /// Creates a new retry future.
     pub fn new(strategy: &Strategy, action: A) -> Retry<A> {
         Retry::new_with_handle(TimerHandle::default(), strategy, action)
     }
 
+    /// Creates a new retry future, using the provided `handle` to schedule timeouts.
     pub fn new_with_handle(handle: TimerHandle, strategy: &Strategy, action: A) -> Retry<A> {
         Retry {
             retry_if: RetryIf::new_with_handle(handle, strategy, action, (|_| true) as fn(&A::Error) -> bool)
         }
+    }
+}
+
+impl<A: Action> fmt::Debug for Retry<A> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Retry").finish()
     }
 }
 
@@ -72,6 +81,7 @@ impl<A, C> RetryIf<A, C>
     where A: Action,
           C: Condition<A::Error>
 {
+    /// Creates a new retry future.
     pub fn new(
         strategy: &Strategy,
         action: A,
@@ -80,6 +90,7 @@ impl<A, C> RetryIf<A, C>
         RetryIf::new_with_handle(TimerHandle::default(), strategy, action, condition)
     }
 
+    /// Creates a new retry future, using the provided `handle` to schedule timeouts.
     pub fn new_with_handle(
         handle: TimerHandle,
         strategy: &Strategy,
@@ -111,6 +122,12 @@ impl<A, C> RetryIf<A, C>
                 self.poll()
             }
         }
+    }
+}
+
+impl<A: Action, C: Condition<A::Error>> fmt::Debug for RetryIf<A, C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("RetryIf").finish()
     }
 }
 

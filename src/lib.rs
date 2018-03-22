@@ -1,3 +1,7 @@
+#![deny(missing_docs)]
+#![deny(warnings)]
+#![deny(missing_debug_implementations)]
+
 //! This library provides asynchronous retry strategies
 //! for use with the popular [`futures`](https://crates.io/crates/futures) crate.
 //!
@@ -47,7 +51,9 @@ pub use future::{Retry, RetryIf};
 
 /// Run the given action, and retry on failure.
 ///
-/// Uses the default `Strategy`.
+/// Uses the default retry strategy with exponential backoff and a maximum of 5 retry attempts.
+///
+/// To customize the retry strategy, take a look at [`Strategy`](./struct.Strategy.html).
 ///
 /// # Example
 ///
@@ -72,7 +78,9 @@ pub fn retry<A: Action>(action: A) -> Retry<A> {
 
 /// Run the given action, and retry on failure if the error satisfies a given condition.
 ///
-/// Uses the default `Strategy`.
+/// Uses the default retry strategy with exponential backoff and a maximum of 5 retry attempts.
+///
+/// To customize the retry strategy, take a look at [`Strategy`](./struct.Strategy.html).
 ///
 /// # Example
 ///
