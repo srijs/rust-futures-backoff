@@ -2,21 +2,21 @@ use std::time::Duration;
 
 use super::{Action, Condition, Retry, RetryIf};
 
-mod fixed_interval;
 mod exponential_backoff;
 mod fibonacci_backoff;
+mod fixed_interval;
 mod jitter;
 
-pub use self::fixed_interval::FixedInterval;
 pub use self::exponential_backoff::ExponentialBackoff;
 pub use self::fibonacci_backoff::FibonacciBackoff;
+pub use self::fixed_interval::FixedInterval;
 pub use self::jitter::jitter;
 
 #[derive(Debug)]
 enum FactorType {
     Exponential,
     Fibonacci,
-    Fixed
+    Fixed,
 }
 
 /// Configurable retry strategy.
@@ -27,9 +27,7 @@ enum FactorType {
 /// # Example
 ///
 /// ```rust
-/// # extern crate futures;
-/// # extern crate futures_backoff;
-/// # use futures::{Future, future};
+/// # use futures::{Future, future, executor::block_on};
 /// # use futures_backoff::Strategy;
 /// #
 /// # fn main() {
@@ -38,10 +36,10 @@ enum FactorType {
 ///
 /// let future = strategy.retry(|| {
 ///     // do some real-world stuff here...
-///     future::ok::<u32, ::std::io::Error>(42)
+///     async { Ok::<u32, ::std::io::Error>(42) }
 /// });
 /// #
-/// # assert_eq!(future.wait().unwrap(), 42);
+/// # assert_eq!(block_on(future).unwrap(), 42);
 /// # }
 /// ```
 #[derive(Debug)]
@@ -50,7 +48,7 @@ pub struct Strategy {
     delay: Duration,
     max_delay: Option<Duration>,
     max_retries: usize,
-    jitter: bool
+    jitter: bool,
 }
 
 impl Default for Strategy {
@@ -60,7 +58,7 @@ impl Default for Strategy {
             delay: Duration::from_millis(1000),
             max_delay: None,
             max_retries: 5,
-            jitter: false
+            jitter: false,
         }
     }
 }
@@ -100,7 +98,7 @@ impl Strategy {
             delay: delay,
             max_delay: None,
             max_retries: 5,
-            jitter: false
+            jitter: false,
         }
     }
 
@@ -131,19 +129,16 @@ impl Strategy {
 
     pub(crate) fn iter(&self) -> StrategyIter {
         let factor_iter = match self.factor {
-            FactorType::Exponential =>
-                FactorIter::Exponential(ExponentialBackoff::new()),
-            FactorType::Fibonacci =>
-                FactorIter::Fibonacci(FibonacciBackoff::new()),
-            FactorType::Fixed =>
-                FactorIter::Fixed(FixedInterval::new())
+            FactorType::Exponential => FactorIter::Exponential(ExponentialBackoff::new()),
+            FactorType::Fibonacci => FactorIter::Fibonacci(FibonacciBackoff::new()),
+            FactorType::Fixed => FactorIter::Fixed(FixedInterval::new()),
         };
         StrategyIter {
             factor_iter: factor_iter,
             delay: self.delay,
             max_delay: self.max_delay,
             retries: self.max_retries,
-            jitter: self.jitter
+            jitter: self.jitter,
         }
     }
 
@@ -154,7 +149,8 @@ impl Strategy {
 
     /// Run the given action, and use this strategy to retry on failure if the error satisfies a given condition.
     pub fn retry_if<A: Action, C>(&self, action: A, condition: C) -> RetryIf<A, C>
-        where C: Condition<A::Error>
+    where
+        C: Condition<A::Error>,
     {
         RetryIf::new(self, action, condition)
     }
@@ -183,7 +179,7 @@ pub(crate) struct StrategyIter {
     delay: Duration,
     max_delay: Option<Duration>,
     retries: usize,
-    jitter: bool
+    jitter: bool,
 }
 
 impl Iterator for StrategyIter {
@@ -200,7 +196,7 @@ impl Iterator for StrategyIter {
                         delay = ::std::cmp::min(delay, max_delay);
                     }
                     self.retries -= 1;
-                    return Some(delay)
+                    return Some(delay);
                 }
             }
         }
@@ -231,7 +227,8 @@ fn fibonacci_returns_the_fibonacci_series_starting_at_10() {
 #[test]
 fn fibonacci_stops_increasing_at_max_delay() {
     let mut s = Strategy::fibonacci(Duration::from_millis(10))
-      .with_max_delay(Duration::from_millis(30)).iter();
+        .with_max_delay(Duration::from_millis(30))
+        .iter();
 
     assert_eq!(s.next(), Some(Duration::from_millis(10)));
     assert_eq!(s.next(), Some(Duration::from_millis(10)));
@@ -243,7 +240,8 @@ fn fibonacci_stops_increasing_at_max_delay() {
 #[test]
 fn fibonacci_returns_max_when_max_less_than_base() {
     let mut s = Strategy::fibonacci(Duration::from_millis(10))
-      .with_max_delay(Duration::from_millis(10)).iter();
+        .with_max_delay(Duration::from_millis(10))
+        .iter();
 
     assert_eq!(s.next(), Some(Duration::from_millis(10)));
     assert_eq!(s.next(), Some(Duration::from_millis(10)));
@@ -270,7 +268,8 @@ fn exponential_returns_multiples_of_100ms() {
 #[test]
 fn exponential_stops_increasing_at_max_delay() {
     let mut s = Strategy::exponential(Duration::from_millis(20))
-      .with_max_delay(Duration::from_millis(40)).iter();
+        .with_max_delay(Duration::from_millis(40))
+        .iter();
 
     assert_eq!(s.next(), Some(Duration::from_millis(20)));
     assert_eq!(s.next(), Some(Duration::from_millis(40)));
@@ -280,7 +279,8 @@ fn exponential_stops_increasing_at_max_delay() {
 #[test]
 fn exponential_returns_max_when_max_less_than_base() {
     let mut s = Strategy::exponential(Duration::from_millis(20))
-      .with_max_delay(Duration::from_millis(10)).iter();
+        .with_max_delay(Duration::from_millis(10))
+        .iter();
 
     assert_eq!(s.next(), Some(Duration::from_millis(10)));
     assert_eq!(s.next(), Some(Duration::from_millis(10)));
