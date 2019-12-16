@@ -14,25 +14,25 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-futures-backoff = "0.1"
+futures-backoff = "0.2"
 ```
 
 ## Examples
 
 ```rust
-extern crate futures;
-extern crate futures_backoff;
+use std::future::Future;
+use std::io::Error;
 
-use futures::{Future, future};
+use futures::executor::block_on;
 use futures_backoff::retry;
 
 fn main() {
     let future = retry(|| {
         // do some real-world stuff here...
-        future::ok::<u32, ::std::io::Error>(42)
+        async { Ok::<u32, Error>(42) }
     });
 
-    let result = future.wait();
+    let result = block_on(future);
 
     assert_eq!(result, Ok(42));
 }
