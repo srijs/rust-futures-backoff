@@ -17,19 +17,16 @@
 //! # Examples
 //!
 //! ```rust
-//! extern crate futures;
-//! extern crate futures_backoff;
-//!
-//! use futures::{Future, future};
+//! use futures::{Future, future, executor::block_on};
 //! use futures_backoff::retry;
 //!
 //! fn main() {
 //!     let future = retry(|| {
 //!         // do some real-world stuff here...
-//!         future::ok::<u32, ::std::io::Error>(42)
+//!         async { Ok::<u32, ::std::io::Error>(42) }
 //!     });
 //!
-//!     let result = future.wait();
+//!     let result = block_on(future);
 //!
 //!     assert_eq!(result.unwrap(), 42);
 //! }
@@ -41,13 +38,13 @@ extern crate rand;
 
 mod action;
 mod condition;
-mod strategy;
 mod future;
+mod strategy;
 
 pub use action::Action;
 pub use condition::Condition;
-pub use strategy::Strategy;
 pub use future::{Retry, RetryIf};
+pub use strategy::Strategy;
 
 /// Run the given action, and retry on failure.
 ///
@@ -58,18 +55,18 @@ pub use future::{Retry, RetryIf};
 /// # Example
 ///
 /// ```rust
-/// # extern crate futures;
-/// # extern crate futures_backoff;
-/// # use futures::{Future, future};
+/// # use std::io::{Error, ErrorKind};
+/// # use std::future::Future;
+/// # use futures::executor::block_on;
 /// # use futures_backoff::retry;
 /// #
 /// # fn main() {
 /// let future = retry(|| {
 ///     // do some real-world stuff here...
-///     future::ok::<u32, ::std::io::Error>(42)
+///     async { Ok::<u32, Error>(42) }
 /// });
 /// #
-/// # assert_eq!(future.wait().unwrap(), 42);
+/// # assert_eq!(block_on(future).unwrap(), 42);
 /// # }
 /// ```
 pub fn retry<A: Action>(action: A) -> Retry<A> {
@@ -85,23 +82,23 @@ pub fn retry<A: Action>(action: A) -> Retry<A> {
 /// # Example
 ///
 /// ```rust
-/// # extern crate futures;
-/// # extern crate futures_backoff;
 /// # use std::io::{Error, ErrorKind};
-/// # use futures::{Future, future};
+/// # use std::future::Future;
+/// # use futures::executor::block_on;
 /// # use futures_backoff::retry_if;
 /// #
 /// # fn main() {
 /// let future = retry_if(|| {
 ///     // do some real-world stuff here...
-///     future::ok(42)
+///     async { Ok(42) }
 /// }, |err: &Error| err.kind() == ErrorKind::TimedOut);
 /// #
-/// # assert_eq!(future.wait().unwrap(), 42);
+/// # assert_eq!(block_on(future).unwrap(), 42);
 /// # }
 /// ```
 pub fn retry_if<A: Action, C>(action: A, condition: C) -> RetryIf<A, C>
-    where C: Condition<A::Error>
+where
+    C: Condition<A::Error>,
 {
     Strategy::default().retry_if(action, condition)
 }

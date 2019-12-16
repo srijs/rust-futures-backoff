@@ -4,15 +4,12 @@ use std::u32::MAX as U32_MAX;
 #[derive(Debug, Clone)]
 pub struct ExponentialBackoff {
     curr: u32,
-    base: u32
+    base: u32,
 }
 
 impl ExponentialBackoff {
     pub fn new() -> ExponentialBackoff {
-        ExponentialBackoff {
-            curr: 1,
-            base: 2
-        }
+        ExponentialBackoff { curr: 1, base: 2 }
     }
 }
 
