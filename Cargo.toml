@@ -11,7 +11,7 @@ edition = "2018"
 
 [dependencies]
 futures = "0.3"
-futures-timer = "2.0"
+futures-timer = "3"
 rand = "0.7"
 
 [dev-dependencies]
